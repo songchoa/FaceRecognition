@@ -1,6 +1,6 @@
-
 bin/
 tmp/
+src/test
 *.tmp
 *.bak
 *.swp
@@ -9,7 +9,6 @@ local.properties
 .settings/
 .loadpath
 .recommenders
-
 # Eclipse Core
 .project
 
