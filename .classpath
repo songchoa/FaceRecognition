@@ -1,6 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/artoolkitplus-macosx-x86_64.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/ffmpeg-macosx-x86_64.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/ffmpeg.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/flandmark-macosx-x86_64.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/flandmark.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/flycapture.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/javacpp.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/javacv.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/libdc1394-macosx-x86_64.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/libdc1394.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/libfreenect-macosx-x86_64.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/libfreenect.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/opencv-macosx-x86_64.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/opencv.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/videoinput.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
