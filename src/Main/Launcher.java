@@ -1,34 +1,65 @@
 package Main;
 
-import static org.bytedeco.javacpp.opencv_core.cvFlip;
-import static org.bytedeco.javacpp.opencv_imgproc.cvResize;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
 import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingWorker;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import javax.swing.JLabel;
 import javax.swing.JButton;
+
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
+
 import javax.swing.GroupLayout;
 import javax.swing.GroupLayout.Alignment;
+
+import static org.bytedeco.javacpp.helper.opencv_objdetect.cvHaarDetectObjects;
+import static org.bytedeco.javacpp.opencv_core.IPL_DEPTH_8U;
+import static org.bytedeco.javacpp.opencv_core.cvClearMemStorage;
+import static org.bytedeco.javacpp.opencv_core.cvCreateImage;
+import static org.bytedeco.javacpp.opencv_core.cvFlip;
+import static org.bytedeco.javacpp.opencv_core.cvGetSeqElem;
+import static org.bytedeco.javacpp.opencv_core.cvGetSize;
+import static org.bytedeco.javacpp.opencv_core.cvLoad;
+import static org.bytedeco.javacpp.opencv_core.cvPoint;
+import static org.bytedeco.javacpp.opencv_imgproc.CV_AA;
+import static org.bytedeco.javacpp.opencv_imgproc.CV_BGR2GRAY;
+import static org.bytedeco.javacpp.opencv_imgproc.CV_INTER_LINEAR;
+import static org.bytedeco.javacpp.opencv_imgproc.cvCvtColor;
+import static org.bytedeco.javacpp.opencv_imgproc.cvEqualizeHist;
+import static org.bytedeco.javacpp.opencv_imgproc.cvRectangle;
+import static org.bytedeco.javacpp.opencv_imgproc.cvResize;
+import static org.bytedeco.javacpp.opencv_objdetect.CV_HAAR_DO_CANNY_PRUNING;
+import static org.bytedeco.javacpp.opencv_imgcodecs.cvSaveImage;
+import static org.bytedeco.javacpp.opencv_core.cvCopy;
+import static org.bytedeco.javacpp.opencv_core.cvSetImageROI;
+
+import org.bytedeco.javacpp.opencv_core.CvMemStorage;
+import org.bytedeco.javacpp.opencv_core.CvRect;
+import org.bytedeco.javacpp.opencv_core.CvScalar;
+import org.bytedeco.javacpp.opencv_core.CvSeq;
 import org.bytedeco.javacpp.opencv_core.IplImage;
+import org.bytedeco.javacpp.opencv_objdetect.CvHaarClassifierCascade;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;
 import org.bytedeco.javacv.Java2DFrameConverter;
 import org.bytedeco.javacv.OpenCVFrameConverter;
 import org.bytedeco.javacv.OpenCVFrameGrabber;
+import org.bytedeco.javacv.VideoInputFrameGrabber;
 
 
 
@@ -51,6 +82,13 @@ public class Launcher extends JFrame {
     protected static boolean mirrored = true;
     protected static double scale = 0.5;
     private static boolean isCancelled = false;
+    
+    private static boolean changeToTrue = false;
+    
+    private static boolean toCapture = false;
+    
+    private static CvRect faceRec;
+    private static final String CASCADE_FILE = "haarcascade_frontalface_alt.xml";
     
     private static void createAndShowGUI() {
     	
@@ -104,6 +142,7 @@ public class Launcher extends JFrame {
         JButton btnDetect = new JButton("Detect");
         btnDetect.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
+            	changeToTrue =false;
             }
         });
         //create add digit button
@@ -139,6 +178,14 @@ public class Launcher extends JFrame {
             	JPanel btnPanel = new JPanel();
             	btnPanel.setLayout(new BoxLayout(btnPanel,BoxLayout.X_AXIS));
             	capture.setAlignmentX(CENTER_ALIGNMENT);
+            	capture.addActionListener(new ActionListener(){
+
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						toCapture = true;
+					}
+            		
+            	});
             	btnPanel.add(capture);
             	recognize.setAlignmentX(CENTER_ALIGNMENT);
             	btnPanel.add(recognize);
@@ -152,6 +199,9 @@ public class Launcher extends JFrame {
         			public void paintComponent(Graphics g) {
         				super.paintComponent(g);
         				g.drawImage(image, 0, 0, null);
+        				if(changeToTrue) {
+        					g.drawLine(40, 40, 100, 100);
+        				}
         			}
         		};
             	
@@ -205,6 +255,7 @@ public class Launcher extends JFrame {
         JButton button = new JButton("Recognize");
         button.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
+            	changeToTrue = true;
             }
         });
         //this is the picture panel 
@@ -283,6 +334,38 @@ public class Launcher extends JFrame {
 					cvResize(grabbed, resized);
 					grabbed = resized;
 				}
+				
+				if(toCapture) {
+					captureFace(grabbed);
+					toCapture = false;
+				}
+				
+				
+				
+				//draw rectangle
+				IplImage grayImg = cvCreateImage(cvGetSize(grabbed), IPL_DEPTH_8U, 1);
+				cvCvtColor(grabbed, grayImg, CV_BGR2GRAY);  
+				IplImage smallImg = IplImage.create(grayImg.width()/2,grayImg.height()/2, IPL_DEPTH_8U, 1);
+				cvResize(grayImg, smallImg, CV_INTER_LINEAR);
+				cvEqualizeHist(smallImg, smallImg);
+				CvMemStorage storage = CvMemStorage.create();
+				CvHaarClassifierCascade cascade = new CvHaarClassifierCascade(cvLoad(CASCADE_FILE));
+				CvSeq faces = cvHaarDetectObjects(smallImg, cascade, storage, 1.1, 3, CV_HAAR_DO_CANNY_PRUNING);
+				cvClearMemStorage(storage);
+				int totalFace = faces.total();
+				for (int i = 0; i < totalFace; i++) {
+					faceRec = new CvRect(cvGetSeqElem(faces, i));
+					cvRectangle(
+							grabbed, 
+							cvPoint( faceRec.x()*2, faceRec.y()*2 ),
+							cvPoint( (faceRec.x() + faceRec.width())*2, (faceRec.y() + faceRec.height())*2 ), 
+							CvScalar.GREEN,
+							6, 
+							CV_AA, 
+							0
+							);
+				}
+				
 				Frame frame = grabberConverter.convert(grabbed);
 				image = paintConverter.getBufferedImage(frame);
 				canvas.repaint();
@@ -292,6 +375,26 @@ public class Launcher extends JFrame {
 			return null;
 		}
 	}
+    
+    public static void captureFace(IplImage img) {
+  
+    	if(faceRec.width() > 0) {
+    		CvRect r = new CvRect();
+    		r.x(faceRec.x()*2);
+    		r.y(faceRec.y()*2);
+    		r.width(faceRec.width()*2);
+    		r.height(faceRec.height()*2);
+    		
+            // After setting ROI (Region-Of-Interest) all processing will only be done on the ROI
+            cvSetImageROI(img, r);
+            IplImage cropped = cvCreateImage(cvGetSize(img), img.depth(), img.nChannels());
+            // Copy original image (only ROI) to the cropped image
+            cvCopy(img, cropped);            
+            cvSaveImage(JOptionPane.showInputDialog("name") + ".jpg", cropped);
+    	}
+        
+        System.out.println("image captured");
+    }
     
 
     public static void main(String[] args) {
