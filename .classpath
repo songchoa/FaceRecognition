@@ -17,5 +17,6 @@
 	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/opencv-macosx-x86_64.jar"/>
 	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/opencv.jar"/>
 	<classpathentry kind="lib" path="/Users/SongChao/Documents/javacv-bin/videoinput.jar"/>
+	<classpathentry kind="lib" path="/Users/SongChao/Downloads/Face Recognition/GUI Face Recognizer/lib/colt.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
