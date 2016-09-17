@@ -4,8 +4,6 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
-import java.awt.Graphics2D;
-
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
 import javax.swing.JComponent;
@@ -23,18 +21,24 @@ import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.nio.IntBuffer;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.swing.GroupLayout;
 import javax.swing.GroupLayout.Alignment;
 
-import static org.bytedeco.javacpp.helper.opencv_objdetect.cvHaarDetectObjects;
+import static org.bytedeco.javacpp.opencv_core.CV_32SC1;
 import static org.bytedeco.javacpp.opencv_core.IPL_DEPTH_8U;
 import static org.bytedeco.javacpp.opencv_core.cvClearMemStorage;
 import static org.bytedeco.javacpp.opencv_core.cvCreateImage;
 import static org.bytedeco.javacpp.opencv_core.cvFlip;
-import static org.bytedeco.javacpp.opencv_core.cvGetSeqElem;
 import static org.bytedeco.javacpp.opencv_core.cvGetSize;
-import static org.bytedeco.javacpp.opencv_core.cvLoad;
 import static org.bytedeco.javacpp.opencv_core.cvPoint;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_AA;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_BGR2GRAY;
@@ -43,26 +47,36 @@ import static org.bytedeco.javacpp.opencv_imgproc.cvCvtColor;
 import static org.bytedeco.javacpp.opencv_imgproc.cvEqualizeHist;
 import static org.bytedeco.javacpp.opencv_imgproc.cvRectangle;
 import static org.bytedeco.javacpp.opencv_imgproc.cvResize;
-import static org.bytedeco.javacpp.opencv_objdetect.CV_HAAR_DO_CANNY_PRUNING;
+import static org.bytedeco.javacpp.opencv_imgcodecs.CV_LOAD_IMAGE_GRAYSCALE;
 import static org.bytedeco.javacpp.opencv_imgcodecs.cvSaveImage;
+import static org.bytedeco.javacpp.opencv_imgcodecs.imread;
 import static org.bytedeco.javacpp.opencv_core.cvCopy;
 import static org.bytedeco.javacpp.opencv_core.cvSetImageROI;
 
 import org.bytedeco.javacpp.opencv_core.CvMemStorage;
 import org.bytedeco.javacpp.opencv_core.CvRect;
 import org.bytedeco.javacpp.opencv_core.CvScalar;
-import org.bytedeco.javacpp.opencv_core.CvSeq;
 import org.bytedeco.javacpp.opencv_core.IplImage;
-import org.bytedeco.javacpp.opencv_objdetect.CvHaarClassifierCascade;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;
 import org.bytedeco.javacv.Java2DFrameConverter;
 import org.bytedeco.javacv.OpenCVFrameConverter;
 import org.bytedeco.javacv.OpenCVFrameGrabber;
-import org.bytedeco.javacv.VideoInputFrameGrabber;
+import static org.bytedeco.javacpp.opencv_objdetect.*;
+import static org.bytedeco.javacpp.opencv_objdetect.CascadeClassifier;
 
+import org.bytedeco.javacpp.opencv_core.Mat;
+import org.bytedeco.javacpp.opencv_core.MatVector;
+import org.bytedeco.javacpp.opencv_core.Rect;
+import org.bytedeco.javacpp.opencv_core.RectVector;
+import org.bytedeco.javacpp.opencv_core.Size;
+import org.bytedeco.javacpp.opencv_face.FaceRecognizer;
 
+import static org.bytedeco.javacpp.opencv_face.createFisherFaceRecognizer;
+import static org.bytedeco.javacpp.opencv_face.createLBPHFaceRecognizer;
+import static org.bytedeco.javacpp.opencv_face.createEigenFaceRecognizer;
 
+import static java.nio.file.StandardCopyOption.*;
 
 public class Launcher extends JFrame {
 
@@ -86,12 +100,19 @@ public class Launcher extends JFrame {
     private static boolean changeToTrue = false;
     
     private static boolean toCapture = false;
+    private static boolean toRecognize = false;
     
-    private static CvRect faceRec;
-    private static final String CASCADE_FILE = "haarcascade_frontalface_alt.xml";
+    private static IplImage gray;
     
+    private static IplImage grabbed;
+    
+    private static int location = 0;
+        
+    private static String imagePath;
+   // private static CvRect faceRec;
+    private static Rect rec;
+//    private static final String CASCADE_FILE = "haarcascade_frontalface_alt.xml";
     private static void createAndShowGUI() {
-    	
     	//construct a frame
     	JFrame frame = new JFrame();
     	//set close operation on the frame
@@ -124,9 +145,8 @@ public class Launcher extends JFrame {
                 try {
                     if (res == JFileChooser.APPROVE_OPTION) {
                         File file = fc.getSelectedFile();
-                        String imagePath = file.getAbsolutePath();
+                        imagePath = file.getAbsolutePath();
                         imgLabel.setIcon(new ImageIcon(imagePath));
-
                     } 
             
                 } catch (Exception iOException) {
@@ -138,13 +158,7 @@ public class Launcher extends JFrame {
         
         //create label for browse button
         JLabel lblSelectTargetPicture = new JLabel("select image");
-        //create the detect button
-        JButton btnDetect = new JButton("Detect");
-        btnDetect.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-            	changeToTrue =false;
-            }
-        });
+
         //create add digit button
         JButton btnAddDigit = new JButton("Open Camera");
         btnAddDigit.addActionListener(new ActionListener() {
@@ -174,7 +188,24 @@ public class Launcher extends JFrame {
             	
             	JButton capture = new JButton("Capture face");
             	JButton recognize = new JButton("Recognize face");
+            	recognize.addActionListener(new ActionListener(){
+
+					@Override
+					public void actionPerformed(ActionEvent arg0) {
+						recoFace();
+					}
+            		
+            	});
             	JButton addnew = new JButton("Add new face");
+            	addnew.addActionListener(new ActionListener(){
+
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						toCapture = true;
+						location = 1;
+					}
+            		
+            	});
             	JPanel btnPanel = new JPanel();
             	btnPanel.setLayout(new BoxLayout(btnPanel,BoxLayout.X_AXIS));
             	capture.setAlignmentX(CENTER_ALIGNMENT);
@@ -183,6 +214,7 @@ public class Launcher extends JFrame {
 					@Override
 					public void actionPerformed(ActionEvent e) {
 						toCapture = true;
+						location = 0;
 					}
             		
             	});
@@ -234,11 +266,11 @@ public class Launcher extends JFrame {
         		height = grabber.getImageHeight();
             	
         		if (scale != 1) {
-        			width = (int)(width*scale*0.8);
-        			height = (int)(height*scale);
+        			width = (int)(width);
+        			height = (int)(height);
         		}
         		
-            	camera.setSize(width,height + 50);
+            	camera.setSize(width,height+80);
             	canvas.setPreferredSize(new Dimension(camera.getWidth(), camera.getHeight()));
             	camera.setLocationRelativeTo(null);
             	camera.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -255,7 +287,7 @@ public class Launcher extends JFrame {
         JButton button = new JButton("Recognize");
         button.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-            	changeToTrue = true;
+            	recoFaceFromPic(imagePath);
             }
         });
         //this is the picture panel 
@@ -275,7 +307,6 @@ public class Launcher extends JFrame {
                             .addComponent(btnBrowse))
                         .addGroup(gl_panel.createSequentialGroup()
                             .addGap(10)
-                            .addComponent(btnDetect)
                             .addGap(18)
                             .addComponent(btnAddDigit))))
                 .addGroup(gl_panel.createSequentialGroup()
@@ -299,7 +330,6 @@ public class Launcher extends JFrame {
                     .addComponent(picPanel, GroupLayout.PREFERRED_SIZE, 199, GroupLayout.PREFERRED_SIZE)
                     .addGap(22)
                     .addGroup(gl_panel.createParallelGroup(Alignment.BASELINE)
-                        .addComponent(btnDetect)
                         .addComponent(btnAddDigit))
                     .addGap(18)
                     .addComponent(button)
@@ -313,10 +343,12 @@ public class Launcher extends JFrame {
     
     private static class CaptureImageThread extends SwingWorker<Void, Void> {
 		protected Void doInBackground() throws Exception {
+		     CascadeClassifier cascade = new CascadeClassifier();
+		     cascade.load("haarcascade_frontalface_alt.xml");
 		    OpenCVFrameConverter.ToIplImage grabberConverter = new OpenCVFrameConverter.ToIplImage();
 		    Java2DFrameConverter paintConverter = new Java2DFrameConverter();
 		    while (!isCancelled) {
-				IplImage grabbed = null;
+				grabbed = null;
 				while (grabbed == null) {
 					try {
 						grabbed = grabberConverter.convert(grabber.grab());
@@ -333,32 +365,37 @@ public class Launcher extends JFrame {
 					IplImage resized = IplImage.create(width, height, grabbed.depth(), grabbed.nChannels());
 					cvResize(grabbed, resized);
 					grabbed = resized;
+					if(toCapture) {
+						saveFace(location);
+						toCapture = false;
+						location = 0;
+					}
+					if(toRecognize) {
+						recoFace();
+						toRecognize = false;
+					}
 				}
-				
-				if(toCapture) {
-					captureFace(grabbed);
-					toCapture = false;
-				}
-				
-				
-				
+
 				//draw rectangle
 				IplImage grayImg = cvCreateImage(cvGetSize(grabbed), IPL_DEPTH_8U, 1);
 				cvCvtColor(grabbed, grayImg, CV_BGR2GRAY);  
 				IplImage smallImg = IplImage.create(grayImg.width()/2,grayImg.height()/2, IPL_DEPTH_8U, 1);
+				Mat img = new Mat(smallImg);
 				cvResize(grayImg, smallImg, CV_INTER_LINEAR);
 				cvEqualizeHist(smallImg, smallImg);
 				CvMemStorage storage = CvMemStorage.create();
-				CvHaarClassifierCascade cascade = new CvHaarClassifierCascade(cvLoad(CASCADE_FILE));
-				CvSeq faces = cvHaarDetectObjects(smallImg, cascade, storage, 1.1, 3, CV_HAAR_DO_CANNY_PRUNING);
+				RectVector faces = new RectVector();
+
+				cascade.detectMultiScale(img, faces, 1.3, 3, CV_HAAR_FIND_BIGGEST_OBJECT, null, null);
 				cvClearMemStorage(storage);
-				int totalFace = faces.total();
-				for (int i = 0; i < totalFace; i++) {
-					faceRec = new CvRect(cvGetSeqElem(faces, i));
+
+				for (int i = 0; i <faces.size(); i++) {
+
+					rec = faces.get(i);
 					cvRectangle(
 							grabbed, 
-							cvPoint( faceRec.x()*2, faceRec.y()*2 ),
-							cvPoint( (faceRec.x() + faceRec.width())*2, (faceRec.y() + faceRec.height())*2 ), 
+							cvPoint( rec.x()*2, rec.y()*2 ),
+							cvPoint( (rec.x() + rec.width())*2, (rec.y() + rec.height())*2 ), 
 							CvScalar.GREEN,
 							6, 
 							CV_AA, 
@@ -376,24 +413,176 @@ public class Launcher extends JFrame {
 		}
 	}
     
-    public static void captureFace(IplImage img) {
-  
-    	if(faceRec.width() > 0) {
+    public static void captureFace() {
+    	IplImage img = grabbed;
+    	if(rec.width() > 0) {
     		CvRect r = new CvRect();
-    		r.x(faceRec.x()*2);
-    		r.y(faceRec.y()*2);
-    		r.width(faceRec.width()*2);
-    		r.height(faceRec.height()*2);
+    		r.x(rec.x()*2);
+    		r.y(rec.y()*2);
+    		r.width(rec.width()*2);
+    		r.height(rec.height()*2);
     		
             // After setting ROI (Region-Of-Interest) all processing will only be done on the ROI
             cvSetImageROI(img, r);
             IplImage cropped = cvCreateImage(cvGetSize(img), img.depth(), img.nChannels());
             // Copy original image (only ROI) to the cropped image
-            cvCopy(img, cropped);            
-            cvSaveImage(JOptionPane.showInputDialog("name") + ".jpg", cropped);
+            cvCopy(img, cropped);
+            Mat inputImg = new Mat(cropped);
+            Mat resultImg = new Mat();
+            Size ruler = new Size(120,120); 
+            org.bytedeco.javacpp.opencv_imgproc.resize(inputImg, resultImg, ruler);
+
+            IplImage beforeGray = new IplImage(resultImg);
+            gray = cvCreateImage(cvGetSize(beforeGray), IPL_DEPTH_8U, 1);
+            cvCvtColor(beforeGray, gray, CV_BGR2GRAY); 
     	}
-        
-        System.out.println("image captured");
+    }
+    
+    public static void saveFace(int locat) throws IOException {
+    	captureFace();
+    	String name = JOptionPane.showInputDialog("name");
+    	if(name != null) {
+    		cvSaveImage( name + ".jpg", gray);
+    		if(locat == 1) {
+        		Path source = FileSystems.getDefault().getPath(name+".jpg");
+        		Path dest = FileSystems.getDefault().getPath("trainingImags/" + name+".jpg");
+        		Files.move(source, dest, REPLACE_EXISTING);   			
+    		}
+
+    		System.out.println("image saved");
+    	}  
+    }
+    
+    public static void recoFace() {
+
+    	if(rec.width()>0) {
+    	captureFace();
+    	Map<Integer, String> hm = new HashMap<Integer, String>();
+    	File root = new File("trainingImags");
+    	 FilenameFilter imgFilter = new FilenameFilter() {
+             public boolean accept(File dir, String name) {
+                 name = name.toLowerCase();
+                 return name.endsWith(".jpg") || name.endsWith(".pgm") || name.endsWith(".png");
+             }
+         };
+         
+    	File[] imageFiles = root.listFiles(imgFilter);
+    	MatVector images = new MatVector(imageFiles.length);
+    	Mat labels = new Mat(imageFiles.length, 1, CV_32SC1);
+        IntBuffer labelsBuf = labels.createBuffer();
+
+        int counter = 0;
+
+        for (File image : imageFiles) {
+            Mat img = imread(image.getAbsolutePath(), CV_LOAD_IMAGE_GRAYSCALE);
+            
+            String[] temp = image.getName().split("\\-");
+            int label = Integer.parseInt(temp[0]);
+            hm.put(label, temp[1]);
+
+            images.put(counter, img);
+
+            labelsBuf.put(counter, label);
+
+            counter++;
+        }
+
+        //FaceRecognizer faceRecognizer = createFisherFaceRecognizer();
+        // FaceRecognizer faceRecognizer = createEigenFaceRecognizer();
+         FaceRecognizer faceRecognizer = createLBPHFaceRecognizer();
+
+        faceRecognizer.train(images, labels);
+        Mat m = new Mat(gray);
+        int predictedLabel = faceRecognizer.predict(m);
+
+        System.out.println("Reconized: " + hm.get(predictedLabel));
+    	hm.clear();
+    	} else {
+    		System.out.println("no face");
+    	}
+    	
+    }
+    
+    private static void recoFaceFromPic(String name) {
+    	Map<Integer, String> hm = new HashMap<Integer, String>();
+
+    	// get rectangle data
+        Mat testImage = imread(name, CV_LOAD_IMAGE_GRAYSCALE);
+        IplImage picture = new IplImage(testImage);
+        CascadeClassifier cascade = new CascadeClassifier();
+	    cascade.load("haarcascade_frontalface_alt.xml");
+	    IplImage grayImg = cvCreateImage(cvGetSize(picture), IPL_DEPTH_8U, 1);
+		cvCvtColor(picture, grayImg, CV_BGR2GRAY);  
+		IplImage smallImg = IplImage.create(grayImg.width()/2,grayImg.height()/2, IPL_DEPTH_8U, 1);
+		Mat image = new Mat(smallImg);
+		cvResize(grayImg, smallImg, CV_INTER_LINEAR);
+		cvEqualizeHist(smallImg, smallImg);
+		RectVector faces = new RectVector();
+		cascade.detectMultiScale(image, faces, 1.3, 3, CV_HAAR_FIND_BIGGEST_OBJECT, null, null);
+	    Rect picRect = faces.get(0);
+	    
+	    
+	    // crop to get gray image
+	    CvRect r = new CvRect();
+		r.x(picRect.x()*2);
+		r.y(picRect.y()*2);
+		r.width(picRect.width()*2);
+		r.height(picRect.height()*2);
+		
+        cvSetImageROI(picture, r);
+        IplImage cropped = cvCreateImage(cvGetSize(picture), picture.depth(), picture.nChannels());
+        cvCopy(picture, cropped);
+        Mat inputImg = new Mat(cropped);
+        Mat resultImg = new Mat();
+        Size ruler = new Size(120,120); 
+        org.bytedeco.javacpp.opencv_imgproc.resize(inputImg, resultImg, ruler);
+
+        IplImage beforeGray = new IplImage(resultImg);
+        IplImage finalTestImage = cvCreateImage(cvGetSize(beforeGray), IPL_DEPTH_8U, 1);
+        cvCvtColor(beforeGray, finalTestImage, CV_BGR2GRAY);
+	    
+        File root = new File("trainingImags");
+
+        FilenameFilter imgFilter = new FilenameFilter() {
+            public boolean accept(File dir, String name) {
+                name = name.toLowerCase();
+                return name.endsWith(".jpg") || name.endsWith(".pgm") || name.endsWith(".png");
+            }
+        };
+
+        File[] imageFiles = root.listFiles(imgFilter);
+
+        MatVector images = new MatVector(imageFiles.length);
+
+        Mat labels = new Mat(imageFiles.length, 1, CV_32SC1);
+        IntBuffer labelsBuf = labels.createBuffer();
+
+        int counter = 0;
+
+        for (File tempImage : imageFiles) {
+            Mat img = imread(tempImage.getAbsolutePath(), CV_LOAD_IMAGE_GRAYSCALE);
+            
+            String[] temp = tempImage.getName().split("\\-");
+            int label = Integer.parseInt(temp[0]);
+            hm.put(label, temp[1]);
+
+            images.put(counter, img);
+
+            labelsBuf.put(counter, label);
+
+            counter++;
+        }
+
+        //FaceRecognizer faceRecognizer = createFisherFaceRecognizer();
+         FaceRecognizer faceRecognizer = createEigenFaceRecognizer();
+        // FaceRecognizer faceRecognizer = createLBPHFaceRecognizer()
+
+        faceRecognizer.train(images, labels);
+
+        int predictedLabel = faceRecognizer.predict(new Mat(finalTestImage));
+
+        System.out.println("Pic: Recognized: " + hm.get(predictedLabel));
+    
     }
     
 
