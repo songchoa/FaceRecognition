@@ -1,5 +1,7 @@
+trainingImages/
 bin/
 tmp/
+temp/
 src/test
 *.tmp
 *.bak
