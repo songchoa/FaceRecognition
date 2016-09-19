@@ -1,1 +1,4 @@
 FaceRecognition
+
+- Can recognize face through webcam or uploaded picture
+- JavaCv and JavaSwing used  
