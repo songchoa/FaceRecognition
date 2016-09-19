@@ -1,0 +1,6 @@
+FaceRecognition
+
+- Can recognize face through webcam or uploaded picture
+- JavaCv and JavaSwing used  
+- References: [Vison-based User Interface Programming in Java](http://fivedots.coe.psu.ac.th/~ad/vbi/index.html#software)
+              [JavaCV Github Tutorial](https://github.com/bytedeco/javacv)
