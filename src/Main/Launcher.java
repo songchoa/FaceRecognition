@@ -190,8 +190,6 @@ public class Launcher extends JFrame {
             
                 } catch (Exception iOException) {
                 }
-     
-        	
             }
         });
         
@@ -243,6 +241,7 @@ public class Launcher extends JFrame {
         		
             	streaming = new CaptureImageThread();
         		streaming.execute();
+        		
 			}
         	
         });
@@ -260,8 +259,8 @@ public class Launcher extends JFrame {
 						grabber = null;
 					}
 					image = null;
-					canvas.repaint(0,0,400,400);
-					
+					canvas.repaint(0,0,400,450);
+	        		
 					
 				} catch (org.bytedeco.javacv.FrameGrabber.Exception e1) {
 					e1.printStackTrace();
@@ -333,6 +332,16 @@ public class Launcher extends JFrame {
 		    	
 		    }
         	
+        });
+        
+        frame.addWindowListener(new java.awt.event.WindowAdapter(){
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+               int result = JOptionPane.showConfirmDialog(frame,"Close window and exit?", "Closing Application",JOptionPane.YES_NO_OPTION);
+               if(result ==JOptionPane.YES_OPTION) {
+            	   System.exit(0);
+               }                           	
+            }
         });
         
         frame.setVisible(true);
@@ -541,7 +550,6 @@ public class Launcher extends JFrame {
         javax.swing.SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 createAndShowGUI();
-                
             }
         });
     }
