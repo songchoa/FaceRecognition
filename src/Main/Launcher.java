@@ -1,3 +1,4 @@
+package Main;
 import java.awt.*;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -8,6 +9,7 @@ import java.awt.event.ActionEvent;
 import java.awt.image.BufferedImage;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.IntBuffer;
@@ -43,6 +45,7 @@ import static org.bytedeco.javacpp.opencv_face.createFisherFaceRecognizer;
 import static org.bytedeco.javacpp.opencv_face.createEigenFaceRecognizer;
 import static java.nio.file.StandardCopyOption.*;
 
+import database.StudentInfoLocalDB;
 
 public class Launcher extends JFrame {
 
@@ -317,14 +320,24 @@ public class Launcher extends JFrame {
 		        }
 
 		        //FaceRecognizer faceRecognizer = createFisherFaceRecognizer();
-		        FaceRecognizer faceRecognizer = createEigenFaceRecognizer();
-		        // FaceRecognizer faceRecognizer = createLBPHFaceRecognizer();
+		        //FaceRecognizer faceRecognizer = createEigenFaceRecognizer();
+		         FaceRecognizer faceRecognizer = createLBPHFaceRecognizer();
 
 		        faceRecognizer.train(images, labels);
 		        Mat m = new Mat(gray);
 		        int predictedLabel = faceRecognizer.predict(m);
-
-		        textFields[0].setText(hm.get(predictedLabel));
+		        String predictedName = hm.get(predictedLabel);
+		        int nameLength = predictedName.length();
+		        predictedName = predictedName.substring(0, nameLength - 4);
+		        try {
+					String[] retrieveData = StudentInfoLocalDB.getInfoByName(predictedName);
+					for(int i = 0; i < retrieveData.length; i++) {
+						textFields[i].setText(retrieveData[i]);
+					}
+				} catch (FileNotFoundException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
 		    	hm.clear();
 		    	} else {
 		    		System.out.println("Log: no face on screen");
@@ -339,6 +352,21 @@ public class Launcher extends JFrame {
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
                int result = JOptionPane.showConfirmDialog(frame,"Close window and exit?", "Closing Application",JOptionPane.YES_NO_OPTION);
                if(result ==JOptionPane.YES_OPTION) {
+            	   isCancelled = true;
+					if(grabber != null) {
+						try {
+							grabber.stop();
+							grabber.release();
+							grabber = null;
+							image = null;
+							canvas.repaint(0,0,400,450);
+						} catch (org.bytedeco.javacv.FrameGrabber.Exception e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						
+					}
+					
             	   System.exit(0);
                }                           	
             }
@@ -540,8 +568,19 @@ public class Launcher extends JFrame {
 
          faceRecognizer.train(images, labels);
          int predictedLabel = faceRecognizer.predict(testImage);
-         textFields[0].setText(hm.get(predictedLabel));
-    	}
+	       
+         String predictedName = hm.get(predictedLabel);
+	        int nameLength = predictedName.length();
+	        predictedName = predictedName.substring(0, nameLength - 4);
+	        try {
+				String[] retrieveData = StudentInfoLocalDB.getInfoByName(predictedName);
+				for(int i = 0; i < retrieveData.length; i++) {
+					textFields[i].setText(retrieveData[i]);
+				}
+			} catch (FileNotFoundException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}    	}
     }
     
 
