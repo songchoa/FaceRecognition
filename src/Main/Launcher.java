@@ -67,9 +67,55 @@ public class Launcher extends JFrame {
     private static CascadeClassifier cascade = new CascadeClassifier("haarcascade_frontalface_alt.xml");    
     private static JPanel picPanel;
     private static JTextField[] textFields;
+    private static FaceRecognizer faceRecognizer;
+    private static Map<Integer, String> hm;
     
+    private static void init()
+    {
+    	System.out.println("Setting start...");
+    	hm = new HashMap<Integer, String>();
+    	File root = new File("trainingImags");
+    	System.out.println("Validate images...");
+    	 FilenameFilter imgFilter = new FilenameFilter() {
+             public boolean accept(File dir, String name) {
+                 name = name.toLowerCase();
+                 return name.endsWith(".jpg") || name.endsWith(".pgm") || name.endsWith(".png");
+             }
+         };
+         System.out.println("Validate images finished.");
+    	File[] imageFiles = root.listFiles(imgFilter);
+    	MatVector images = new MatVector(imageFiles.length);
+    	Mat matLabels = new Mat(imageFiles.length, 1, CV_32SC1);
+        IntBuffer labelsBuf = matLabels.createBuffer();
+
+        int counter = 0;
+        
+        System.out.println("Extracting images labels...");
+        for (File image : imageFiles) {
+            Mat img = imread(image.getAbsolutePath(), CV_LOAD_IMAGE_GRAYSCALE);
+            
+            String[] temp = image.getName().split("\\-");
+            int label = Integer.parseInt(temp[0]);
+            hm.put(label, temp[1]);
+
+            images.put(counter, img);
+
+            labelsBuf.put(counter, label);
+
+            counter++;
+        }
+        System.out.println("Extractign image labels finished.");
+         faceRecognizer = createFisherFaceRecognizer();
+        //FaceRecognizer faceRecognizer = createEigenFaceRecognizer();
+        //FaceRecognizer faceRecognizer = createLBPHFaceRecognizer();
+         System.out.println("Training images...");
+        faceRecognizer.train(images, matLabels);
+        System.out.println("Training image finished.");
+        
+    }
     
     private static void createAndShowGUI() {
+    	init();
     	//construct a frame
     	JFrame frame = new JFrame();
     	frame.pack();
@@ -289,44 +335,12 @@ public class Launcher extends JFrame {
 
 		    	if(grabbed != null && rec.width()>0) {
 		    	captureFace();
-		    	Map<Integer, String> hm = new HashMap<Integer, String>();
-		    	File root = new File("trainingImags");
-		    	 FilenameFilter imgFilter = new FilenameFilter() {
-		             public boolean accept(File dir, String name) {
-		                 name = name.toLowerCase();
-		                 return name.endsWith(".jpg") || name.endsWith(".pgm") || name.endsWith(".png");
-		             }
-		         };
-		         
-		    	File[] imageFiles = root.listFiles(imgFilter);
-		    	MatVector images = new MatVector(imageFiles.length);
-		    	Mat labels = new Mat(imageFiles.length, 1, CV_32SC1);
-		        IntBuffer labelsBuf = labels.createBuffer();
-
-		        int counter = 0;
-
-		        for (File image : imageFiles) {
-		            Mat img = imread(image.getAbsolutePath(), CV_LOAD_IMAGE_GRAYSCALE);
-		            
-		            String[] temp = image.getName().split("\\-");
-		            int label = Integer.parseInt(temp[0]);
-		            hm.put(label, temp[1]);
-
-		            images.put(counter, img);
-
-		            labelsBuf.put(counter, label);
-
-		            counter++;
-		        }
-
-		        //FaceRecognizer faceRecognizer = createFisherFaceRecognizer();
-		        //FaceRecognizer faceRecognizer = createEigenFaceRecognizer();
-		         FaceRecognizer faceRecognizer = createLBPHFaceRecognizer();
-
-		        faceRecognizer.train(images, labels);
-		        Mat m = new Mat(gray);
+		    	Mat m = new Mat(gray);
 		        int predictedLabel = faceRecognizer.predict(m);
+		        System.out.println("Predicted lable = " + predictedLabel);
 		        String predictedName = hm.get(predictedLabel);
+		        System.out.println("Predicted name = " + predictedName + "\n" + "HM size = " + hm.size());
+		      
 		        int nameLength = predictedName.length();
 		        predictedName = predictedName.substring(0, nameLength - 4);
 		        try {
@@ -338,7 +352,7 @@ public class Launcher extends JFrame {
 					// TODO Auto-generated catch block
 					e1.printStackTrace();
 				}
-		    	hm.clear();
+		    	
 		    	} else {
 		    		System.out.println("Log: no face on screen");
 		    	}
@@ -563,7 +577,7 @@ public class Launcher extends JFrame {
          }
 
         // FaceRecognizer faceRecognizer = createFisherFaceRecognizer();
-         // FaceRecognizer faceRecognizer = createEigenFaceRecognizer();
+         //FaceRecognizer faceRecognizer = createEigenFaceRecognizer();
           FaceRecognizer faceRecognizer = createLBPHFaceRecognizer();
 
          faceRecognizer.train(images, labels);
@@ -591,5 +605,6 @@ public class Launcher extends JFrame {
                 createAndShowGUI();
             }
         });
+        
     }
 }
